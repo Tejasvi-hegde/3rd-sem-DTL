@@ -3,10 +3,13 @@ import pickle
 import cvzone
 import numpy as np
 
-cap = cv2.VideoCapture('E:\Parking-Space-Counter-using-Machine-learning\public\carPark.mp4')
+cap = cv2.VideoCapture('public\\carPark.mp4')
+if not cap.isOpened():
+    print("Error: Could not open video file.")
+    exit()
 width, height = 103, 43
 try:
-    with open(r'E:\Parking-Space-Counter-using-Machine-learning\programs\polygons', 'rb') as f:
+    with open('programs\\polygons', 'rb') as f:
         posList = pickle.load(f)
 except FileNotFoundError:
     print("Polygons file not found!")
