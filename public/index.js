@@ -1,11 +1,14 @@
 // Initialize the map
 const map = L.map("map").setView([12.923, 77.502], 13);
-
+var marker, circle;
+var latt, longg;
 // Add OpenStreetMap tiles
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
   attribution: "© OpenStreetMap contributors",
 }).addTo(map);
+
+
 
 document.getElementById("showpoint").addEventListener("click", showMarker);
 
@@ -20,10 +23,7 @@ document.getElementById("showpoint").addEventListener("click", showMarker);
     searchLabel: 'Search for a place...',
     keepResult: true
   });
-
-  // Add the GeoSearch control to the map
   map.addControl(searchControl);
-
   // Sync GeoSearch results with L.Control.geocoder functionality
   map.on('geosearch/showlocation', function (result) {
     const bbox = [
@@ -39,18 +39,20 @@ map.on("click", (e) => {
   alert(`Coordinates: Latitude ${lat}, Longitude ${lng}`);
 });
 
+
 const points = [
   {
     name: "Point 1",
-    coords: [12.942643430569182, 77.51197814941408],
+    coords: [12.957590216689608,  77.61347293853761],
     program: "camera",
   },
   {
     name: "Point 2",
-    coords: [12.925745529955678, 77.51644134521486],
+    coords: [12.951358577143894,  77.61308670043947],
     program: "main_with_Trackbars",
   },
 ];
+
 
 function runProgram(programName) {
   console.log(`Running ${programName}...`);
@@ -80,7 +82,7 @@ function runProgram(programName) {
         videoWrapper.style.display = "none"; // Hide the video wrapper
       }
     });
-  } else {
+  } else if(programName=="main_with_Trackbars"){
     // Example: Sending a request to a server to execute the program
     fetch(`http://localhost:5000/run-program`, {
       method: "POST",
@@ -100,14 +102,23 @@ function runProgram(programName) {
 
 // Add markers for the points and attach click events
 function showMarker() {
+
   points.forEach((point) => {
-    const marker = L.marker(point.coords)
+    const yellowIcon = L.icon({
+      iconUrl: "/yellow marker.png",
+      iconSize: [24, 40],
+      iconAnchor: [12, 40],
+    });
+    L.marker(point.coords, { icon: yellowIcon })
       .addTo(map)
-      .bindPopup(`Click to run ${point.program}`)
+      .bindPopup(`Parking Space: ${point.name}<br>Program: ${point.program}`)
       .on("click", () => {
         runProgram(point.program);
-      });
-  });
+       });
+    });
+
+showNearbyParking(latt,longg);
+
 }
 
 if (!navigator.geolocation) {
@@ -118,28 +129,44 @@ if (!navigator.geolocation) {
   }, 5000);
 }
 
-var marker, circle;
-var latt, longg;
+
+
 function getPosition(position) {
   // console.log(position)
   latt = position.coords.latitude;
   longg = position.coords.longitude;
   var accuracy = position.coords.accuracy;
 
-  if (marker) {
-    map.removeLayer(marker);
-  }
+  if (latt && longg) {
+    const userLocation = L.latLng(latt, longg);
 
-  if (circle) {
-    map.removeLayer(circle);
-  }
+    const redIcon = L.icon({
+      iconUrl: "/red marker.png",
+      iconSize: [24, 40],
+      iconAnchor: [12, 40],
+    });
 
-  marker = L.marker([latt, longg]);
-  circle = L.circle([latt, longg], { radius: 30 });
+    if (marker) {
+      map.removeLayer(marker);
+    }
+    marker = L.marker([latt, longg], { icon: redIcon }).addTo(map).bindPopup("Your Location");
 
-  var featureGroup = L.featureGroup([marker, circle]).addTo(map);
+  // if (marker) {
+  //   map.removeLayer(marker);
+  // }
+
+  // if (circle) {
+  //   map.removeLayer(circle);
+  // }
+
+  // marker = L.marker([latt, longg]);
+  // circle = L.circle([latt, longg], { radius: 30 });
+
+  // var featureGroup = L.featureGroup([marker, circle]).addTo(map);
 
   //map.fitBounds(featureGroup.getBounds())
+
+
 
   console.log(
     "Your coordinate is: Lat: " +
@@ -149,12 +176,65 @@ function getPosition(position) {
       " Accuracy: " +
       accuracy
   );
+}}
+
+
+async function showNearbyParking(userLat, userLng) {
+  const radius = 2500; // Radius in meters (1.5 km)
+
+  // Overpass API query to fetch parking spaces
+  const overpassQuery = `
+    [out:json];
+    node
+      ["amenity"="parking"]
+      (around:${radius},${userLat},${userLng});
+    out body;
+  `;
+
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+
+  try {
+    // Fetch parking data
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Failed to fetch parking data.");
+    const data = await response.json();
+
+    // Process parking spaces
+    const nearbyParking = data.elements.map((element) => ({
+      name: element.tags.name || "Unnamed Parking Spot",
+      coords: [element.lat, element.lon],
+    }));
+    
+    const greenIcon = L.icon({
+      iconUrl: "/blue marker.png",
+      iconSize: [24, 40],
+      iconAnchor: [12, 40],
+    });
+
+  
+
+    // Add markers for nearby parking spaces
+    if (nearbyParking.length > 0) {
+      nearbyParking.forEach((parking) => {
+        L.marker(parking.coords, { icon: greenIcon })
+          .addTo(map)
+          .bindPopup(`Parking Space: ${parking.name}`);
+      });
+    } else {
+      alert("No nearby parking spaces found within 1.5 km.");
+    }
+  } catch (error) {
+    console.error("Error fetching or displaying parking data:", error);
+    alert("Failed to load nearby parking spaces.");
+  }
 }
+
+
 document.getElementById("shortest").addEventListener("click", () => {
   // Coordinates for starting and destination points
   const pointA = L.latLng(latt, longg); // Starting point (latitude, longitude)
-const pointB = L.latLng(12.942643430569182, 77.51197814941408); // Example coordinates for pointB
-const pointC = L.latLng(12.925745529955678, 77.51644134521486); // Example coordinates for pointC
+const pointB = L.latLng(12.957590216689608,  77.61347293853761); // Example coordinates for pointB
+const pointC = L.latLng(12.951358577143894,  77.61308670043947); // Example coordinates for pointC
 
 // Calculate distances from pointA
 const distances = [
